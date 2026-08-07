@@ -16,8 +16,10 @@ from .const import (
     CONF_DIRECT,
     CONF_FREQUENCY,
     CONF_NAME,
+    CONF_SUB_ENTITIES,
     CONF_TRANSMITTER,
     DOMAIN,
+    ENTITY_TYPE_BUTTON,
 )
 
 
@@ -27,31 +29,44 @@ async def async_setup_entry(
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Add a button entity for each learned custom button."""
-    commands = entry.data[CONF_COMMANDS]
-    async_add_entities(
-        RfFanButton(entry, custom)
-        for custom in entry.data.get(CONF_CUSTOMS, [])
-        if custom["key"] in commands
-    )
+    data = entry.data
+    commands = data[CONF_COMMANDS]
+    entities: list[ButtonEntity] = []
+
+    # Custom buttons from the main entity wizard
+    for custom in data.get(CONF_CUSTOMS, []):
+        if custom["key"] in commands:
+            entities.append(RfButton(entry, name=custom["name"], key=custom["key"]))
+
+    # Sub-entities of type button (each is treated as a group of buttons via its customs)
+    for sub in data.get(CONF_SUB_ENTITIES, []):
+        if sub.get("entity_type") == ENTITY_TYPE_BUTTON:
+            # A "button" sub-entity is just an extra button — its key is its key_prefix
+            key = sub["key_prefix"]
+            if key in commands:
+                entities.append(RfButton(entry, name=sub["name"], key=key))
+
+    if entities:
+        async_add_entities(entities)
 
 
-class RfFanButton(ButtonEntity):
+class RfButton(ButtonEntity):
     """A custom learned button - presses send the captured code once."""
 
     _attr_has_entity_name = True
 
-    def __init__(self, entry: ConfigEntry, custom: dict[str, str]) -> None:
+    def __init__(self, entry: ConfigEntry, name: str, key: str) -> None:
         """Initialise from a custom button definition."""
-        self._command = entry.data[CONF_COMMANDS][custom["key"]]
+        self._command = entry.data[CONF_COMMANDS][key]
         self._transmitter = entry.data[CONF_TRANSMITTER]
         self._frequency = entry.data[CONF_FREQUENCY]
         self._direct = entry.data.get(CONF_DIRECT, False)
-        self._attr_name = custom["name"]
-        self._attr_unique_id = f"{entry.entry_id}_{custom['key']}"
+        self._attr_name = name
+        self._attr_unique_id = f"{entry.entry_id}_{key}"
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, entry.entry_id)},
             name=entry.data[CONF_NAME],
-            manufacturer="RF Fan (Broadlink Learning)",
+            manufacturer="RF Device (Broadlink Learning)",
         )
 
     async def async_press(self) -> None:

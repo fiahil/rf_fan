@@ -2,17 +2,24 @@
   "config": {
     "step": {
       "user": {
-        "title": "Add an RF fan",
-        "description": "Name your fan and choose the Broadlink to transmit through. Set how many speeds it has, and optionally add a light or any extra buttons (Timer, Breeze, …). You'll learn each one next.\n\nTip: when learning speeds, press whichever button actually runs the fan at that speed — some remotes are mislabeled.",
+        "title": "Add an RF device",
+        "description": "Name the device, pick its primary entity type, and choose which RF transmitter to use.",
         "data": {
-          "name": "Fan name",
+          "name": "Device name",
+          "entity_type": "Primary entity type",
           "transmitter": "RF transmitter",
-          "frequency": "Frequency",
+          "frequency": "Frequency"
+        }
+      },
+      "entity_options": {
+        "title": "Options for {entity_type}",
+        "description": "Configure the specific options for this entity. You'll learn each button next.",
+        "data": {
           "speed_count": "Number of speeds",
           "has_on_button": "Remote has a separate On button",
-          "has_light": "Remote has a light (on/off toggle)",
-          "direct_capture": "Skip the frequency sweep (try this if a fan won't detect)",
-          "custom_buttons": "Extra buttons (one per line, or comma-separated)"
+          "has_stop_button": "Remote has a Stop button",
+          "light_mode": "Light control type",
+          "direct_capture": "Skip the frequency sweep (try this if the remote won't detect)"
         }
       },
       "learn_press": {
@@ -21,7 +28,7 @@
       },
       "learn_result": {
         "title": "Captured",
-        "description": "Got {pulses} pulses for the **{button}** button. Send it to the fan to test, keep it, or try again.",
+        "description": "Got {pulses} pulses for the **{button}** button. Send it to test, keep it, or try again.",
         "menu_options": {
           "confirm": "Keep and continue",
           "test": "Test (send it now)",
@@ -52,10 +59,10 @@
   "options": {
     "step": {
       "init": {
-        "title": "Configure RF fan",
+        "title": "Configure RF device",
         "menu_options": {
           "relearn": "Re-learn a button",
-          "add": "Add a new button",
+          "add_entity": "Add a new entity",
           "finish": "Done"
         }
       },
@@ -66,20 +73,31 @@
           "button": "Button"
         }
       },
-      "add": {
-        "title": "Add a button",
-        "description": "Name the new button (e.g. Timer, Breeze). You'll learn it next; it becomes its own button entity.",
+      "add_entity": {
+        "title": "Add a new entity",
+        "description": "Choose the type and give it a name. You'll learn its buttons next.",
         "data": {
-          "name": "Button name"
+          "entity_type": "Entity type",
+          "name": "Entity name"
+        }
+      },
+      "add_entity_options": {
+        "title": "Options for {entity_type} — {name}",
+        "description": "Configure the specific options for this new entity.",
+        "data": {
+          "speed_count": "Number of speeds",
+          "has_on_button": "Remote has a separate On button",
+          "has_stop_button": "Remote has a Stop button",
+          "light_mode": "Light control type"
         }
       },
       "learn_press": {
         "title": "Release, then press again",
-        "description": "Locked onto the **{button}** button's signal. Let go of it now. Then select **Submit** and press **{button}** once more to capture the code."
+        "description": "Locked onto the **{button}** signal. Let go of it now, then select **Submit** and press **{button}** once more."
       },
       "learn_result": {
         "title": "Captured",
-        "description": "Got {pulses} pulses for the **{button}** button. Send it to the fan to test, keep it, or try again.",
+        "description": "Got {pulses} pulses for **{button}**. Send it to test, keep it, or try again.",
         "menu_options": {
           "confirm": "Keep it",
           "test": "Test (send it now)",
@@ -88,7 +106,7 @@
       },
       "learn_error": {
         "title": "Nothing captured",
-        "description": "No code came through for the **{button}** button ({error}). Try again, or capture without the frequency sweep — that works for remotes the sweep can't lock onto (just one press at the set frequency).",
+        "description": "No code came through for **{button}** ({error}).",
         "menu_options": {
           "retry": "Try again",
           "retry_direct": "Capture without the sweep"
@@ -96,9 +114,9 @@
       }
     },
     "progress": {
-      "sweep": "Press and hold the **{button}** button on your remote, and keep holding until the next screen appears.",
-      "capture": "Now press the **{button}** button once to capture it.",
-      "press": "Press the **{button}** button on your remote once now to capture it."
+      "sweep": "Press and hold **{button}** on your remote and keep holding until the next screen appears.",
+      "capture": "Now press **{button}** once to capture it.",
+      "press": "Press **{button}** once on your remote to capture it."
     },
     "abort": {
       "no_rf_device": "No RF-capable Broadlink device found. Make sure your Broadlink is online."

@@ -28,8 +28,10 @@ from .const import (
     CONF_HAS_ON,
     CONF_NAME,
     CONF_SPEED_COUNT,
+    CONF_SUB_ENTITIES,
     CONF_TRANSMITTER,
     DOMAIN,
+    ENTITY_TYPE_FAN,
 )
 
 
@@ -39,7 +41,31 @@ async def async_setup_entry(
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up the fan entity from a config entry."""
-    async_add_entities([RfFan(entry)])
+    data = entry.data
+    entities: list[FanEntity] = []
+
+    primary_type = data.get("entity_type", ENTITY_TYPE_FAN)
+    if primary_type == ENTITY_TYPE_FAN:
+        entities.append(RfFan(
+            entry,
+            name=data[CONF_NAME],
+            key_prefix="",
+            speed_count=data.get(CONF_SPEED_COUNT, 3),
+            has_on=data.get(CONF_HAS_ON, False),
+        ))
+
+    for sub in data.get(CONF_SUB_ENTITIES, []):
+        if sub.get("entity_type") == ENTITY_TYPE_FAN:
+            entities.append(RfFan(
+                entry,
+                name=sub["name"],
+                key_prefix=sub["key_prefix"],
+                speed_count=sub.get("speed_count", 3),
+                has_on=sub.get("has_on", False),
+            ))
+
+    if entities:
+        async_add_entities(entities)
 
 
 class RfFan(FanEntity, RestoreEntity):
@@ -54,32 +80,44 @@ class RfFan(FanEntity, RestoreEntity):
     _attr_name = None
     _attr_should_poll = False
     _attr_assumed_state = True
-    _attr_translation_key = "fan"
 
-    def __init__(self, entry: ConfigEntry) -> None:
+    def __init__(
+        self,
+        entry: ConfigEntry,
+        name: str,
+        key_prefix: str,
+        speed_count: int,
+        has_on: bool,
+    ) -> None:
         """Initialise from the config entry's learned commands."""
         data = entry.data
         self._transmitter: str = data[CONF_TRANSMITTER]
         self._frequency: int = data[CONF_FREQUENCY]
         self._commands: dict[str, Any] = data[CONF_COMMANDS]
-        self._speed_count: int = data[CONF_SPEED_COUNT]
-        self._has_on: bool = data.get(CONF_HAS_ON, False)
+        self._speed_count = speed_count
+        self._has_on = has_on
         self._direct: bool = data.get(CONF_DIRECT, False)
+        self._key_prefix = key_prefix
+        self._attr_name = name if key_prefix else None
+        uid_suffix = f"fan_{key_prefix}" if key_prefix else "fan"
 
-        self._attr_unique_id = f"{entry.entry_id}_fan"
+        self._attr_unique_id = f"{entry.entry_id}_{uid_suffix}"
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, entry.entry_id)},
             name=data[CONF_NAME],
-            manufacturer="RF Fan (Broadlink Learning)",
+            manufacturer="RF Device (Broadlink Learning)",
         )
         self._attr_supported_features = (
             FanEntityFeature.SET_SPEED
             | FanEntityFeature.TURN_ON
             | FanEntityFeature.TURN_OFF
         )
-        self._attr_speed_count = self._speed_count
+        self._attr_speed_count = speed_count
         self._attr_is_on = False
         self._attr_percentage = 0
+
+    def _pk(self, cmd: str) -> str:
+        return f"{self._key_prefix}_{cmd}" if self._key_prefix else cmd
 
     async def async_added_to_hass(self) -> None:
         """Restore the last assumed state across restarts."""
@@ -94,7 +132,7 @@ class RfFan(FanEntity, RestoreEntity):
         command = self._commands.get(key)
         if not command:
             raise HomeAssistantError(
-                f"Command '{key}' was not learned for this fan."
+                f"Command '{key}' not learned."
             )
         await async_send_stored(
             self.hass,
@@ -116,7 +154,7 @@ class RfFan(FanEntity, RestoreEntity):
             await self.async_turn_off()
             return
         speed = self._speed_from_percentage(percentage)
-        await self._send(f"speed_{speed}")
+        await self._send(self._pk(f"speed_{speed}"))
         self._attr_is_on = True
         self._attr_percentage = ranged_value_to_percentage((1, self._speed_count), speed)
         self.async_write_ha_state()
@@ -131,8 +169,9 @@ class RfFan(FanEntity, RestoreEntity):
         if percentage is not None:
             await self.async_set_percentage(percentage)
             return
-        if self._has_on and CMD_ON in self._commands:
-            await self._send(CMD_ON)
+        on_key = self._pk(CMD_ON)
+        if self._has_on and on_key in self._commands:
+            await self._send(on_key)
             self._attr_is_on = True
             if not self._attr_percentage:
                 self._attr_percentage = ranged_value_to_percentage(
@@ -141,7 +180,7 @@ class RfFan(FanEntity, RestoreEntity):
         else:
             # No dedicated On button: resume the last speed, or speed 1.
             speed = self._speed_from_percentage(self._attr_percentage or 1)
-            await self._send(f"speed_{speed}")
+            await self._send(self._pk(f"speed_{speed}"))
             self._attr_is_on = True
             self._attr_percentage = ranged_value_to_percentage(
                 (1, self._speed_count), speed
@@ -150,7 +189,7 @@ class RfFan(FanEntity, RestoreEntity):
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn the fan off."""
-        await self._send(CMD_OFF)
+        await self._send(self._pk(CMD_OFF))
         self._attr_is_on = False
         self._attr_percentage = 0
         self.async_write_ha_state()
