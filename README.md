@@ -1,4 +1,4 @@
-# RF Fan with Learning
+# RF Device with Learning
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
 
@@ -38,7 +38,7 @@ doesn't give you a *fan* with speed control. This integration does:
 
 1. In HACS, open the three-dot menu → **Custom repositories**.
 2. Add `https://github.com/clevrdavid/rf_fan` with category **Integration**.
-3. Install **RF Fan with Learning**, then **restart Home Assistant**.
+3. Install **RF Device with Learning**, then **restart Home Assistant**.
 
 *(Once accepted into the HACS default store, you'll be able to search for it
 directly without adding the custom repository.)*
@@ -50,7 +50,7 @@ directory and restart.
 
 ## Setup
 
-1. **Settings → Devices & Services → Add Integration → RF Fan with Learning.**
+1. **Settings → Devices & Services → Add Integration → RF Device with Learning.**
 2. Give the fan a name and tell the wizard about its remote:
    - **Speed count** — how many discrete speeds (e.g. 3).
    - **Separate On button** — tick if the remote has a dedicated On (some only have
