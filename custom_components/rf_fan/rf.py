@@ -22,8 +22,17 @@ from .const import BROADLINK_DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
-# Broadlink RF front-end timing resolution. Must match encode_rf_packet().
-_TICK_US = 32.84
+# Broadlink RF front-end timing resolution, in microseconds per tick. It must be
+# the value core's ``encode_rf_packet`` divides by, or every replayed pulse is
+# scaled by the ratio of the two:
+# - HA 2026.10+ ships python-broadlink >= 1.0 and core encodes with its
+#   ``broadlink.remote.TICK`` (8192 / 269, about 30.45 us);
+# - HA 2026.5 - 2026.9 ship broadlink 0.19 (which has no TICK) and core
+#   hardcodes 32.84.
+try:
+    from broadlink.remote import TICK as _TICK_US
+except ImportError:  # broadlink 0.19.x
+    _TICK_US = 32.84
 
 # Matches the Broadlink remote's own learning behaviour.
 LEARNING_TIMEOUT = 30.0  # seconds

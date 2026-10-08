@@ -69,7 +69,10 @@ Some remotes send very short bursts that Broadlink's frequency *sweep* can't loc
 onto (e.g. the **Mercator FRM97**). Tick **"Capture without the sweep"** (direct
 capture) and set the frequency (usually `433.92` MHz) — it listens at that
 frequency directly, like learning an IR code. Directly-captured fans are
-automatically transmitted as a cleaned, repeated frame so they trigger reliably.
+automatically transmitted as a cleaned, repeated frame so they trigger reliably:
+the most common frame in the capture is re-sent several times, separated by the
+inter-frame gap **measured from your own capture** (receivers need their remote's
+gap to re-sync — ~1.8 ms on the Mercator FRM97, ~6.5 ms on the Create Windcalm).
 
 ### Re-learning
 

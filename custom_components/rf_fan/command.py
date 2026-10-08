@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from base64 import b64decode
+import logging
 from typing import Any
 
 from rf_protocols import ModulationType, RadioFrequencyCommand
@@ -10,6 +12,9 @@ from homeassistant.components.radio_frequency import async_send_command
 from homeassistant.core import HomeAssistant
 
 from .mercator import clean_frame
+from .rf import decode_broadlink_packet
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class CapturedCommand(RadioFrequencyCommand):
@@ -59,6 +64,29 @@ def _trim_idle(timings: list[int]) -> list[int]:
     return ts
 
 
+def _stored_timings(data: dict[str, Any]) -> list[int]:
+    """Return a stored command's pulse train in microseconds at today's tick.
+
+    The raw Broadlink packet (``b64``) is the capture's ground truth: it holds
+    tick counts, and the transmitter re-quantises our microseconds back to
+    ticks. ``timings`` were decoded with whatever tick was in force when the
+    button was learned, and that tick changed in Home Assistant 2026.10 (32.84
+    -> 30.45 us), so a capture learned before the upgrade would otherwise be
+    replayed about 8% too slow. Re-decoding the packet keeps replays exact
+    without re-learning. ``timings`` remain the fallback for entries without a
+    packet.
+    """
+    if b64 := data.get("b64"):
+        try:
+            timings, _ = decode_broadlink_packet(b64decode(b64))
+        except (ValueError, IndexError):
+            _LOGGER.debug("rf_fan: stored packet undecodable, using stored timings")
+        else:
+            if timings:
+                return timings
+    return [int(t) for t in data["timings"]]
+
+
 async def async_send_stored(
     hass: HomeAssistant,
     transmitter: str,
@@ -68,18 +96,28 @@ async def async_send_stored(
     clean: bool = False,
     repeat: int = 0,
 ) -> None:
-    """Send a stored command dict (``{"timings"}``) via a transmitter.
+    """Send a stored command dict (``{"b64", "timings"}``) via a transmitter.
 
     Normally we send the (idle-trimmed) captured train once - it already holds
     several frame repeats. With ``clean=True`` we instead send a single de-noised
     consensus frame, which the Broadlink repeats ``repeat`` times: needed for
-    fussy Manchester remotes (e.g. Mercator FRM97) whose raw captures contain
-    noisy frames.
+    fussy remotes (e.g. Mercator FRM97) whose raw captures contain noisy frames.
+    The clean frame carries the inter-frame gap measured in the capture, since
+    receivers need their own gap length to re-synchronise between repeats.
     """
+    raw = _stored_timings(data)
     if clean:
-        timings = clean_frame(data["timings"]) or _trim_idle(data["timings"])
+        timings = clean_frame(raw) or _trim_idle(raw)
     else:
-        timings = _trim_idle(data["timings"])
+        timings = _trim_idle(raw)
+    _LOGGER.debug(
+        "rf_fan: sending %d pulses via %s (clean=%s, repeat=%d, trailing gap=%d us)",
+        len(timings),
+        transmitter,
+        clean,
+        repeat,
+        timings[-1] if timings else 0,
+    )
     command = CapturedCommand(
         frequency=frequency, timings=timings, repeat_count=repeat
     )
