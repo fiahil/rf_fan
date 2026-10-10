@@ -1,9 +1,7 @@
-"""Core RF helpers for the rf_fan integration.
+"""Broadlink RF learning helpers for the rf_fan integration.
 
-Decodes Broadlink RF pulse packets into raw OOK timings - the inverse of
-``homeassistant.components.broadlink.radio_frequency.encode_rf_packet`` - and
-drives the Broadlink two-step RF learn flow. Together these let a code captured
-by a Broadlink be replayed through the generic ``radio_frequency`` platform.
+Capture packets using the Broadlink two-step RF learn flow or direct capture,
+then decode their pulse timings for storage and replay.
 """
 
 from __future__ import annotations
@@ -19,56 +17,12 @@ from broadlink.exceptions import ReadError, StorageError
 from homeassistant.core import HomeAssistant
 
 from .const import BROADLINK_DOMAIN
+from .packet import decode_broadlink_packet
 
 _LOGGER = logging.getLogger(__name__)
 
-# Broadlink RF front-end timing resolution, in microseconds per tick. It must be
-# the value core's ``encode_rf_packet`` divides by, or every replayed pulse is
-# scaled by the ratio of the two:
-# - HA 2026.10+ ships python-broadlink >= 1.0 and core encodes with its
-#   ``broadlink.remote.TICK`` (8192 / 269, about 30.45 us);
-# - HA 2026.5 - 2026.9 ship broadlink 0.19 (which has no TICK) and core
-#   hardcodes 32.84.
-try:
-    from broadlink.remote import TICK as _TICK_US
-except ImportError:  # broadlink 0.19.x
-    _TICK_US = 32.84
-
 # Matches the Broadlink remote's own learning behaviour.
 LEARNING_TIMEOUT = 30.0  # seconds
-
-
-def decode_broadlink_packet(packet: bytes) -> tuple[list[int], int]:
-    """Decode a Broadlink pulse packet into signed alternating microseconds.
-
-    Packet layout (see encode_rf_packet):
-        byte 0       type byte (0xB2/0xD7 433 MHz, 0xB4 315 MHz) - ignored here
-        byte 1       repeat count
-        bytes 2..3   payload length, little-endian, counted from byte 4
-        bytes 4..    pulses: one byte per pulse, or 0x00 followed by a two-byte
-                     big-endian tick count for pulses of 256 ticks or more
-
-    Returns ``(timings, repeat_count)``. Even indices are marks (positive us),
-    odd indices are spaces (negative us) - the format OOKCommand expects. The
-    leading type byte does not affect pulse decoding, so this is robust to the
-    small differences between learned and re-encoded packets.
-    """
-    repeat = packet[1]
-    length = packet[2] | (packet[3] << 8)
-    pulses = packet[4 : 4 + length]
-
-    timings: list[int] = []
-    i = 0
-    while i < len(pulses):
-        if pulses[i] == 0x00:
-            ticks = (pulses[i + 1] << 8) | pulses[i + 2]
-            i += 3
-        else:
-            ticks = pulses[i]
-            i += 1
-        microseconds = round(ticks * _TICK_US)
-        timings.append(microseconds if len(timings) % 2 == 0 else -microseconds)
-    return timings, repeat
 
 
 def find_rf_devices(hass: HomeAssistant) -> dict[str, Any]:
@@ -136,7 +90,7 @@ async def async_capture_packet(
             continue  # nothing captured yet, keep polling
         timings, repeat = decode_broadlink_packet(code)
         _LOGGER.debug(
-            "rf_fan: captured %d pulses (raw repeat byte=%d, ignored on resend)",
+            "rf_fan: captured %d pulses (packet byte 1=%d, ignored on resend)",
             len(timings),
             repeat,
         )

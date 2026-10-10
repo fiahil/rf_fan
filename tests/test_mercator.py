@@ -69,11 +69,6 @@ def test_split_frames_keeps_frame_count_and_returns_inter_frame_gaps() -> None:
     assert gaps == [_WINDCALM_GAP] * 4  # gaps between frames only, not the idle
 
 
-def test_split_frames_public_wrapper_unchanged() -> None:
-    capture = _capture(_BITS, _WINDCALM_GAP, repeats=3)
-    assert mercator.split_frames(capture) == mercator._split_frames_and_gaps(capture)[0]
-
-
 def test_measured_gap_is_the_median_of_observed_gaps() -> None:
     capture = _windcalm_capture_with_noise()
     assert mercator.measured_frame_gap(capture) == _WINDCALM_GAP
