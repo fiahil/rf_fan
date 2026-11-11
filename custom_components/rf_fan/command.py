@@ -6,8 +6,6 @@ from base64 import b64decode
 import logging
 from typing import Any
 
-from broadlink.exceptions import BroadlinkException
-from broadlink.remote import rm4pro
 from rf_protocols import ModulationType, RadioFrequencyCommand
 
 from homeassistant.components.radio_frequency import async_send_command
@@ -19,6 +17,16 @@ from homeassistant.helpers import entity_registry as er
 from .const import BROADLINK_DOMAIN
 from .mercator import clean_frame
 from .packet import RM4_RF_TYPE, decode_broadlink_packet, encode_rm4_packet
+
+# The library behind core's Broadlink devices: ``broadlink_async`` from Home
+# Assistant 2026.10.2, ``broadlink`` before that. The device objects and the
+# errors they raise are instances of that library's classes, so it comes first.
+try:
+    from broadlink_async.exceptions import BroadlinkException
+    from broadlink_async.remote import rm4pro
+except ImportError:
+    from broadlink.exceptions import BroadlinkException
+    from broadlink.remote import rm4pro
 
 _LOGGER = logging.getLogger(__name__)
 

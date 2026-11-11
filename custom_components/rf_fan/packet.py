@@ -2,12 +2,17 @@
 
 from __future__ import annotations
 
-# Match the tick used by Home Assistant's Broadlink RF encoder. Older supported
-# HA releases use broadlink 0.19, which has no TICK and encodes at 32.84 us.
+# Match the tick used by Home Assistant's Broadlink RF encoder. Core's library
+# is ``broadlink_async`` from HA 2026.10.2 and ``broadlink`` before that; the
+# oldest supported releases use broadlink 0.19, which has no TICK and encodes
+# at 32.84 us.
 try:
-    from broadlink.remote import TICK as _TICK_US
+    from broadlink_async.remote import TICK as _TICK_US
 except ImportError:
-    _TICK_US = 32.84
+    try:
+        from broadlink.remote import TICK as _TICK_US
+    except ImportError:
+        _TICK_US = 32.84
 
 RM4_RF_TYPE = 0xB1
 

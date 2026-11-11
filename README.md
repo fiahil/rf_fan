@@ -27,6 +27,10 @@ doesn't give you a *fan* with speed control. This integration does:
 ## Requirements
 
 - **Home Assistant 2026.5 or newer** (the `radio_frequency` platform ships in 2026.5).
+  On **2026.10.2 or newer, use rf_fan 1.1.3 or newer**: from that release Home
+  Assistant imports its Broadlink library as `broadlink_async`, and older rf_fan
+  versions either fail to load (`No module named 'broadlink'`) or can no longer
+  learn codes.
 - A **Broadlink RM Pro / RM4 Pro** (or other RF-capable Broadlink) already set up in
   the **Broadlink integration**. Select its `radio_frequency` transmitter;
   native RM4 Pro packets are sent through that device's Broadlink connection.

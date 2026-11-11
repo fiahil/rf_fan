@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import importlib.util
 from pathlib import Path
+import sys
+import types
 
 import pytest
 
@@ -68,3 +70,52 @@ def test_decode_ignores_bytes_beyond_declared_payload() -> None:
 def test_decode_rejects_truncated_native_packets(capture: bytes) -> None:
     with pytest.raises(ValueError):
         packet.decode_broadlink_packet(capture)
+
+
+def _packet_with_libraries(
+    monkeypatch: pytest.MonkeyPatch, libraries: dict[str, float | None]
+) -> types.ModuleType:
+    """Load packet.py with stand-ins for the Broadlink libraries.
+
+    ``libraries`` maps an import name to the TICK its ``remote`` module has, or
+    to None for a library without one (broadlink 0.19). A library that is not
+    named cannot be imported, whatever the environment has installed.
+    """
+    for name in ("broadlink_async", "broadlink"):
+        library = remote = None
+        if name in libraries:
+            remote = types.ModuleType(f"{name}.remote")
+            if libraries[name] is not None:
+                remote.TICK = libraries[name]
+            library = types.ModuleType(name)
+            library.remote = remote
+        monkeypatch.setitem(sys.modules, name, library)
+        monkeypatch.setitem(sys.modules, f"{name}.remote", remote)
+    spec = importlib.util.spec_from_file_location("rf_fan_packet_libraries", _MODULE_PATH)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+@pytest.mark.parametrize(
+    ("libraries", "tick"),
+    [
+        # Home Assistant 2026.10.2 and newer: broadlink-async.
+        ({"broadlink_async": 8192 / 269}, 8192 / 269),
+        # Both importable (rf_fan 1.1.0 pinned `broadlink`): core's comes first,
+        # as in command.py and rf.py.
+        ({"broadlink_async": 30.0, "broadlink": 31.0}, 30.0),
+        # 2026.10.0 - 2026.10.1: python-broadlink 1.0, imported as `broadlink`.
+        ({"broadlink": 8192 / 269}, 8192 / 269),
+        # 2026.5 - 2026.9: broadlink 0.19 has no TICK; core encodes at 32.84 us.
+        ({"broadlink": None}, 32.84),
+        ({}, 32.84),
+    ],
+)
+def test_tick_comes_from_the_library_core_uses(
+    monkeypatch: pytest.MonkeyPatch,
+    libraries: dict[str, float | None],
+    tick: float,
+) -> None:
+    assert _packet_with_libraries(monkeypatch, libraries)._TICK_US == tick

@@ -12,12 +12,17 @@ import logging
 import time
 from typing import Any
 
-from broadlink.exceptions import ReadError, StorageError
-
 from homeassistant.core import HomeAssistant
 
 from .const import BROADLINK_DOMAIN
 from .packet import decode_broadlink_packet
+
+# Same library as core's Broadlink devices (see command.py): the "nothing
+# captured yet" errors must be the classes the device raises.
+try:
+    from broadlink_async.exceptions import ReadError, StorageError
+except ImportError:
+    from broadlink.exceptions import ReadError, StorageError
 
 _LOGGER = logging.getLogger(__name__)
 
